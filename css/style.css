@@ -1,0 +1,130 @@
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f0f2f5;
+    margin: 0;
+    padding: 20px;
+}
+
+.post-container {
+    max-width: 600px;
+    margin: 20px auto;
+    padding: 15px;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+}
+
+.post-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.user-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: #ccc;
+    margin-right: 10px;
+}
+
+.user-name {
+    font-weight: bold;
+    color: #333;
+}
+
+.post-content {
+    margin: 15px 0;
+    font-size: 14px;
+    color: #555;
+}
+
+.post-affection {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    color: #888;
+}
+
+.likes, .dislikes {
+    display: inline-flex;
+    align-items: center;
+}
+
+.likes::before, .dislikes::before {
+    content: '👍';
+    margin-right: 5px;
+}
+
+.dislikes::before {
+    content: '👎';
+}
+
+.comments-section {
+    display: none; /* Hidden by default, shown when button is clicked */
+    margin-top: 20px;
+    padding-left: 20px;
+    border-left: 2px solid #ddd;
+}
+
+.comment {
+    margin-bottom: 15px;
+}
+
+.comment-header {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    color: #555;
+}
+
+.comment-content {
+    margin: 10px 0;
+    font-size: 14px;
+    color: #333;
+}
+
+.comment-affection {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    color: #888;
+}
+
+.replies-section {
+    display: none; /* Hidden by default, shown when 'View Replies' is clicked */
+    margin-top: 10px;
+    padding-left: 20px;
+    border-left: 1px solid #ccc;
+}
+
+.replies-link {
+    cursor: pointer;
+    color: #007bff;
+    text-decoration: underline;
+}
+
+.load-more {
+    cursor: pointer;
+    color: #007bff;
+    text-decoration: underline;
+    margin-top: 10px;
+    display: block;
+}
+
+.reply-form {
+    margin-top: 10px;
+}
+
+textarea {
+    width: 100%;
+    height: 60px;
+    margin-bottom: 5px;
+    padding: 5px;
+    font-size: 14px;
+}
+
+select {
+    margin-bottom: 5px;
+}

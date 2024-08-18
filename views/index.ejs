@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Posts</title>
+    <link rel="stylesheet" href="/css/style.css"> 
+    <script>
+let commentPage = {}; // Object to track page numbers for each comment
+let replyPage = {}; // Object to track page numbers for each reply
+
+function showComments(postId) {
+    const commentsSection = document.getElementById('comments-' + postId);
+    if (commentsSection.style.display === 'none') {
+        fetchComments(postId, 0); // Load first page of comments
+        commentsSection.style.display = 'block';
+    } else {
+        commentsSection.style.display = 'none';
+    }
+}
+
+function fetchComments(postId, page) {
+    fetch(`http://localhost:5000/comments/${postId}?page=${page}&size=5`)
+        .then(response => response.json())
+        .then(comments => {
+            let commentsHtml = '';
+            comments.forEach(comment => {
+                commentsHtml += createCommentHtml(comment);
+            });
+            const commentsSection = document.getElementById('comments-' + postId);
+            commentsSection.innerHTML += commentsHtml;
+
+            // Populate user dropdowns after comments are added
+            fetchUsers();
+
+            // Check if there are more comments to load
+            const button = document.getElementById('load-more-' + postId);
+            if (comments.length > 0) {
+                button.style.display = 'block';
+            } else {
+                button.style.display = 'none';
+            }
+
+            // Update the page number for this post
+            commentPage[postId] = (commentPage[postId] || 0) + 1;
+        })
+        .catch(error => console.error('Error fetching comments:', error));
+}
+
+
+function loadMoreComments(postId) {
+    fetchComments(postId, commentPage[postId] || 0);
+}
+
+function createCommentHtml(comment) {
+    return `
+        <div class="comment" id="comment-${comment.id}" data-post-id="${comment.post.id}">
+            <div class="comment-header">
+                <span>${comment.user.name}</span>
+                <a class="replies-link" onclick="showReplies(${comment.id})">View Replies</a>
+                <div id="replies-${comment.id}" class="replies-section"></div>
+            </div>
+            <div class="comment-content">${comment.statement}</div>
+            <div class="comment-affection">
+                <div>Likes: ${comment.affection.likes}</div>
+                <div>Dislikes: ${comment.affection.dislikes}</div>
+            </div>
+            <textarea id="reply-statement-${comment.id}" placeholder="Write a reply..."></textarea>
+            <select id="user-id-${comment.id}">
+                <!-- User options will be populated here -->
+            </select>
+            <button onclick="submitReply(${comment.id})">Submit Reply</button>
+        </div>`;
+}
+
+
+
+function showReplies(commentId, postId) {
+    const repliesSection = document.getElementById('replies-' + commentId);
+    if (repliesSection.style.display === 'none') {
+        fetchReplies(commentId, 0, postId); // Load first page of replies
+        repliesSection.style.display = 'block';
+    } else {
+        repliesSection.style.display = 'none';
+    }
+}
+
+
+function fetchReplies(commentId, page, postId) {
+    fetch(`http://localhost:5000/replies/${commentId}?page=${page}&size=3`)
+        .then(response => response.json())
+        .then(replies => {
+            let repliesHtml = '';
+            replies.forEach(reply => {
+                repliesHtml += createReplyHtml(reply);
+            });
+            const repliesSection = document.getElementById('replies-' + commentId);
+            repliesSection.innerHTML += repliesHtml;
+
+            fetchUsers();
+
+            // Check if there are more replies to load
+            const button = document.getElementById('load-more-replies-' + commentId);
+            if (replies.length > 0) {
+                button.style.display = 'block';
+            } else {
+                button.style.display = 'none';
+            }
+
+            // Update the page number for this comment
+            replyPage[commentId] = (replyPage[commentId] || 0) + 1;
+        })
+        .catch(error => console.error('Error fetching replies:', error));
+}
+
+
+function createReplyHtml(reply) {
+    return `
+        <div class="comment" id="reply-${reply.id}"  data-post-id="${reply.post.id}">
+            <div class="comment-header">
+                <span>${reply.user.name}</span>
+                <a class="replies-link" onclick="showReplies(${reply.id}, ${reply.post.id})">View Replies</a>
+                <div id="replies-${reply.id}" class="replies-section"></div>
+            </div>
+            <div class="comment-content">${reply.statement}</div>
+            <div class="comment-affection">
+                <div>Likes: ${reply.affection.likes}</div>
+                <div>Dislikes: ${reply.affection.dislikes}</div>
+            </div>
+            <textarea id="reply-statement-${reply.id}" placeholder="Write a reply..."></textarea>
+            <select id="user-id-${reply.id}">
+                <!-- User options will be populated here -->
+            </select>
+            <button onclick="submitReply(${reply.id}, ${reply.post.id})">Submit Reply</button>
+        </div>`;
+}
+
+function loadMoreReplies(commentId) {
+    fetchReplies(commentId, replyPage[commentId] || 0);
+}
+
+
+function submitReply(parentId, postId) {
+    const statement = document.getElementById(`reply-statement-${parentId}`).value;
+    const userId = parseInt(document.getElementById(`user-id-${parentId}`).value, 10);
+    const parentCommentId = parentId;
+
+    fetch('http://localhost:5000/comments/create', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            statement,
+            userId,
+            postId,
+            parentCommentId
+        }),
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log('Reply created:', data);
+        const repliesSection = document.getElementById('replies-' + parentId);
+        repliesSection.innerHTML = '';
+        fetchReplies(parentId, 0, postId); // Refresh replies
+    })
+    .catch(error => console.error('Error:', error));
+}
+
+
+function fetchUsers() {
+    fetch('http://localhost:5000/users')
+        .then(response => response.json())
+        .then(users => {
+            // Populate all dropdowns
+            const userSelects = document.querySelectorAll('select[id^="user-id-"]');
+            userSelects.forEach(select => {
+                select.innerHTML = users.map(user => 
+                    `<option value="${user.id}">${user.name}</option>`
+                ).join('');
+            });
+        })
+        .catch(error => console.error('Error fetching users:', error));
+}
+
+// Call fetchUsers() when the page loads
+window.onload = fetchUsers;
+
+
+    </script>
+</head>
+<body>
+    <h1>Posts</h1>
+    <% if (error) { %>
+        <p><%= error %></p>
+    <% } %>
+    <% if (posts.length > 0) { %>
+        <% posts.forEach(post => { %>
+            <div class="post-container">
+                <div class="post-header">
+                    <div class="user-avatar"></div>
+                    <div class="user-name"><%= post.user.name %></div>
+                </div>
+                <div class="post-content"><%= post.statement %></div>
+                <div class="post-affection">
+                    <div class="likes">Likes: <%= post.affection.likes %></div>
+                    <div class="dislikes">Dislikes: <%= post.affection.dislikes %></div>
+                </div>
+                <button onclick="showComments(<%= post.id %>)">Show Comments</button>
+                <div id="comments-<%= post.id %>" class="comments-section"></div>
+                <a id="load-more-<%= post.id %>" class="load-more" style="display: none;" onclick="loadMoreComments(<%= post.id %>)">View More Comments</a>
+            </div>
+        <% }) %>
+    <% } else { %>
+        <p>No posts available.</p>
+    <% } %>
+</body>
+</html>
