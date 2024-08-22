@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create New Post</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <h1>Create New Post</h1>
+
+    <% if (error) { %>
+        <p><%= error %></p>
+    <% } %>
+
+    <form id="new-post-form">
+        <div>
+            <label for="statement">Statement:</label>
+            <textarea id="statement" name="statement" required></textarea>
+        </div>
+        <div>
+            <label for="userId">Select User:</label>
+            <select id="userId" name="userId" required>
+                <% users.forEach(user => { %>
+                    <option value="<%= user.id %>"><%= user.name %></option>
+                <% }) %>
+            </select>
+        </div>
+        <button type="submit">Submit</button>
+    </form>
+
+    <script>
+        document.getElementById('new-post-form').addEventListener('submit', function(event) {
+            event.preventDefault();
+
+            const statement = document.getElementById('statement').value;
+            const userId = parseInt(document.getElementById('userId').value, 10);
+
+            fetch('http://localhost:8080/posts', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ statement, userId }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Post created:', data);
+                alert('Post created successfully!');
+                window.location.href = '/';
+            })
+            .catch(error => console.error('Error:', error));
+        });
+    </script>
+</body>
+</html>

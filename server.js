@@ -10,7 +10,6 @@ app.use(express.json()); // Middleware to parse JSON request bodies
 app.use('/css', express.static(path.join(__dirname, 'css')));
 app.set('view engine', 'ejs');
 app.set('views', './views');
-
 app.get('/', async (req, res) => {
     const page = parseInt(req.query.page) || 0; // Default to page 1 if no page query
     const size = 3; // Number of posts per page
@@ -82,6 +81,33 @@ app.get('/users', async (req, res) => {
     } catch (error) {
         res.status(500).json({ error: 'Error fetching users' });
     }
+});
+
+app.get('/new-post', async (req, res) => {
+    try {
+        // Fetch users to populate the dropdown
+        const response = await axios.get('http://localhost:8080/users');
+        res.render('newPost', { users: response.data , error: null});
+    } catch (error) {
+        res.render('newPost', { users: [], error: 'Error fetching users' });
+    }
+});
+
+// Route to handle post submission
+app.post('/submit-post', (req, res) => {
+    const { statement, userId } = req.body;
+
+    axios.post('http://localhost:8080/posts', {
+        statement: statement,
+        userId: parseInt(userId, 10)
+    })
+    .then(response => {
+        res.redirect('/'); // Redirect back to the main page after submission
+    })
+    .catch(error => {
+        console.error('Error submitting post:', error);
+        res.status(500).send('Failed to submit post');
+    });
 });
 
 app.listen(port, () => {

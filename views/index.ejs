@@ -23,11 +23,18 @@ function fetchComments(postId, page) {
     fetch(`http://localhost:5000/comments/${postId}?page=${page}&size=5`)
         .then(response => response.json())
         .then(comments => {
-            let commentsHtml = '';
-            comments.forEach(comment => {
-                commentsHtml += createCommentHtml(comment);
-            });
             const commentsSection = document.getElementById('comments-' + postId);
+            let commentsHtml = '';
+
+            if (comments.length === 0) {
+                // No comments; show the form to add a new comment
+                commentsHtml = createReplyForm(postId, null); // Use null for parentCommentId
+            } else {
+                comments.forEach(comment => {
+                    commentsHtml += createCommentHtml(comment);
+                });
+            }
+
             commentsSection.innerHTML += commentsHtml;
 
             // Populate user dropdowns after comments are added
@@ -35,11 +42,7 @@ function fetchComments(postId, page) {
 
             // Check if there are more comments to load
             const button = document.getElementById('load-more-' + postId);
-            if (comments.length > 0) {
-                button.style.display = 'block';
-            } else {
-                button.style.display = 'none';
-            }
+            button.style.display = comments.length > 0 ? 'block' : 'none';
 
             // Update the page number for this post
             commentPage[postId] = (commentPage[postId] || 0) + 1;
@@ -47,9 +50,65 @@ function fetchComments(postId, page) {
         .catch(error => console.error('Error fetching comments:', error));
 }
 
+function createReplyForm(postId, parentId) {
+    return `
+        <div class="comment-form">
+            <textarea id="reply-statement-${parentId || postId}" placeholder="Write a comment..."></textarea>
+            <select id="user-id-${parentId || postId}">
+                <!-- User options will be populated here -->
+            </select>
+            <button onclick="submitReply(${parentId}, ${postId})">Submit Comment</button>
+        </div>`;
+}
+
 
 function loadMoreComments(postId) {
     fetchComments(postId, commentPage[postId] || 0);
+}
+
+
+function likeAffection(contextId, contextType) {
+    const selectElement = document.getElementById(`user-id-${contextId}`);
+    const userId = selectElement.value;
+
+    fetch('http://localhost:8080/affections/like', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            contextId,
+            contextType,
+            userId
+        }),
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log('Like response:', data);
+    })
+    .catch(error => console.error('Error liking affection:', error));
+}
+
+function dislikeAffection(contextId, contextType) {
+    const selectElement = document.getElementById(`user-id-${contextId}`);
+    const userId = selectElement.value;
+
+    fetch('http://localhost:8080/affections/dislike', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            contextId,
+            contextType,
+            userId
+        }),
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log('Dislike response:', data);
+    })
+    .catch(error => console.error('Error disliking affection:', error));
 }
 
 function createCommentHtml(comment) {
@@ -57,66 +116,41 @@ function createCommentHtml(comment) {
         <div class="comment" id="comment-${comment.id}" data-post-id="${comment.post.id}">
             <div class="comment-header">
                 <span>${comment.user.name}</span>
-                <a class="replies-link" onclick="showReplies(${comment.id})">View Replies</a>
+                <a class="replies-link" onclick="showReplies(${comment.id}, ${comment.post.id})">View Replies</a>
                 <div id="replies-${comment.id}" class="replies-section"></div>
             </div>
             <div class="comment-content">${comment.statement}</div>
             <div class="comment-affection">
-                <div>Likes: ${comment.affection.likes}</div>
-                <div>Dislikes: ${comment.affection.dislikes}</div>
+                <select id="user-id-${comment.id}" data-context-id="${comment.id}" data-context-type="COMMENT">
+                    <!-- User options will be populated here -->
+                </select>
+                <div class="likes" onclick="showAffectionUsers(${comment.id}, 'COMMENT', 'LIKE')">
+                    Likes: ${comment.affectionCount.likes}
+                </div>
+                <div class="dislikes" onclick="showAffectionUsers(${comment.id}, 'COMMENT', 'DISLIKE')">
+                    Dislikes: ${comment.affectionCount.dislikes}
+                </div>
+                <button onclick="likeAffection(${comment.id}, 'COMMENT')">Like</button>
+                <button onclick="dislikeAffection(${comment.id}, 'COMMENT')">Dislike</button>
+                <!-- Reply Button -->
+                <button onclick="toggleReplyForm(${comment.id})">Reply</button>
             </div>
-            <textarea id="reply-statement-${comment.id}" placeholder="Write a reply..."></textarea>
-            <select id="user-id-${comment.id}">
-                <!-- User options will be populated here -->
-            </select>
-            <button onclick="submitReply(${comment.id})">Submit Reply</button>
+            <!-- Reply Form as Popup -->
+            <div id="reply-form-${comment.id}" class="reply-form" style="display: none;">
+                <textarea id="reply-statement-${comment.id}" placeholder="Write a reply..."></textarea>
+                <select id="reply-user-id-${comment.id}">
+                    <!-- User options will be populated here -->
+                </select>
+                <button onclick="submitReply(${comment.id}, ${comment.post.id})">Submit Reply</button>
+                <span class="close-btn" onclick="toggleReplyForm(${comment.id})">&times;</span>
+            </div>
         </div>`;
-}
-
-
-
-function showReplies(commentId, postId) {
-    const repliesSection = document.getElementById('replies-' + commentId);
-    if (repliesSection.style.display === 'none') {
-        fetchReplies(commentId, 0, postId); // Load first page of replies
-        repliesSection.style.display = 'block';
-    } else {
-        repliesSection.style.display = 'none';
-    }
-}
-
-
-function fetchReplies(commentId, page, postId) {
-    fetch(`http://localhost:5000/replies/${commentId}?page=${page}&size=3`)
-        .then(response => response.json())
-        .then(replies => {
-            let repliesHtml = '';
-            replies.forEach(reply => {
-                repliesHtml += createReplyHtml(reply);
-            });
-            const repliesSection = document.getElementById('replies-' + commentId);
-            repliesSection.innerHTML += repliesHtml;
-
-            fetchUsers();
-
-            // Check if there are more replies to load
-            const button = document.getElementById('load-more-replies-' + commentId);
-            if (replies.length > 0) {
-                button.style.display = 'block';
-            } else {
-                button.style.display = 'none';
-            }
-
-            // Update the page number for this comment
-            replyPage[commentId] = (replyPage[commentId] || 0) + 1;
-        })
-        .catch(error => console.error('Error fetching replies:', error));
 }
 
 
 function createReplyHtml(reply) {
     return `
-        <div class="comment" id="reply-${reply.id}"  data-post-id="${reply.post.id}">
+        <div class="comment" id="reply-${reply.id}" data-post-id="${reply.post.id}">
             <div class="comment-header">
                 <span>${reply.user.name}</span>
                 <a class="replies-link" onclick="showReplies(${reply.id}, ${reply.post.id})">View Replies</a>
@@ -124,47 +158,172 @@ function createReplyHtml(reply) {
             </div>
             <div class="comment-content">${reply.statement}</div>
             <div class="comment-affection">
-                <div>Likes: ${reply.affection.likes}</div>
-                <div>Dislikes: ${reply.affection.dislikes}</div>
+                <div>Likes: ${reply.affectionCount.likes}</div>
+                <div>Dislikes: ${reply.affectionCount.dislikes}</div>
+                <!-- Reply Button -->
+                <button onclick="toggleReplyForm(${reply.id})">Reply</button>
             </div>
-            <textarea id="reply-statement-${reply.id}" placeholder="Write a reply..."></textarea>
-            <select id="user-id-${reply.id}">
-                <!-- User options will be populated here -->
-            </select>
-            <button onclick="submitReply(${reply.id}, ${reply.post.id})">Submit Reply</button>
+            <!-- Reply Form as Popup -->
+            <div id="reply-form-${reply.id}" class="reply-form" style="display: none;">
+                <textarea id="reply-statement-${reply.id}" placeholder="Write a reply..."></textarea>
+                <select id="reply-user-id-${reply.id}">
+                    <!-- User options will be populated here -->
+                </select>
+                <button onclick="submitReply(${reply.id}, ${reply.post.id})">Submit Reply</button>
+                <span class="close-btn" onclick="toggleReplyForm(${reply.id})">&times;</span>
+            </div>
         </div>`;
 }
+
+
+async function populateUserDropdown(commentId) {
+    try {
+        const response = await fetch('/users');
+        const users = await response.json();
+        const dropdown = document.getElementById('reply-user-id-' + commentId);
+
+        // Clear existing options
+        dropdown.innerHTML = '';
+
+        // Populate dropdown with users
+        users.forEach(user => {
+            const option = document.createElement('option');
+            option.value = user.id;
+            option.textContent = user.name;
+            dropdown.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Error fetching users:', error);
+    }
+}
+
+function showReplies(commentId, postId) {
+    const repliesSection = document.getElementById('replies-' + commentId);
+    const replyForm = document.getElementById('reply-form-' + commentId);
+
+    if (repliesSection.style.display === 'none') {
+        fetchReplies(commentId, 0, postId); // Load first page of replies
+        repliesSection.style.display = 'block';
+        replyForm.style.display = 'block'; // Show the reply form
+
+        populateUserDropdown(commentId); // Populate user dropdown
+    } else {
+        repliesSection.style.display = 'none';
+        replyForm.style.display = 'none'; // Hide the reply form
+    }
+}
+function fetchReplies(commentId, page, postId) {
+    fetch(`http://localhost:5000/replies/${commentId}?page=${page}&size=3`)
+        .then(response => response.json())
+        .then(replies => {
+            const repliesSection = document.getElementById('replies-' + commentId);
+            let repliesHtml = '';
+
+            if (replies.length > 0) {
+                replies.forEach(reply => {
+                    console.log(reply)
+                    repliesHtml += createReplyHtml(reply);
+                });
+            } else {
+                repliesHtml = '<p>No replies available.</p>';
+            }
+
+            repliesSection.innerHTML = repliesHtml;
+
+            // Populate user dropdowns after replies are added
+            fetchUsers();
+
+            // Show the reply form for the parent comment
+            const replyForm = document.getElementById('reply-form-' + commentId);
+            replyForm.style.display = 'block';
+        })
+        .catch(error => console.error('Error fetching replies:', error));
+}
+
 
 function loadMoreReplies(commentId) {
     fetchReplies(commentId, replyPage[commentId] || 0);
 }
 
 
-function submitReply(parentId, postId) {
-    const statement = document.getElementById(`reply-statement-${parentId}`).value;
-    const userId = parseInt(document.getElementById(`user-id-${parentId}`).value, 10);
-    const parentCommentId = parentId;
+function toggleReplyForm(commentId) {
+    const popup = document.getElementById(`reply-form-${commentId}`);
+    popup.style.display = (popup.style.display === 'none' || popup.style.display === '') ? 'block' : 'none';
+}
 
-    fetch('http://localhost:5000/comments/create', {
+function submitReply(commentId, postId) {
+    const statement = document.getElementById(`reply-statement-${commentId}`).value;
+    const userId = document.getElementById(`reply-user-id-${commentId}`).value;
+
+    fetch('/comments/create', {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json',
+            'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-            statement,
-            userId,
-            postId,
-            parentCommentId
-        }),
+            statement: statement,
+            userId: userId,
+            postId: postId,
+            parentCommentId: commentId
+        })
     })
     .then(response => response.json())
     .then(data => {
-        console.log('Reply created:', data);
-        const repliesSection = document.getElementById('replies-' + parentId);
-        repliesSection.innerHTML = '';
-        fetchReplies(parentId, 0, postId); // Refresh replies
+        console.log('Reply submitted:', data);
+        // Close popup and optionally update the UI to show the new reply
+        toggleReplyForm(commentId);
+        loadReplies(commentId, postId); // Reload replies to show the new reply
     })
-    .catch(error => console.error('Error:', error));
+    .catch(error => console.error('Error submitting reply:', error));
+}
+
+// function showReplies(commentId, postId) {
+//     fetch(`/replies/${commentId}?page=0&size=3`)
+//         .then(response => response.json())
+//         .then(replies => {
+//             const repliesSection = document.getElementById(`replies-${commentId}`);
+//             repliesSection.innerHTML = replies.map(reply => createReplyHtml(reply)).join('');
+//         })
+//         .catch(error => console.error('Error fetching replies:', error));
+// }
+
+function fetchAffectionUsers(contextId, contextType, affectionType) {
+    fetch(`http://localhost:8080/affections?contextId=${contextId}&contextType=${contextType}&affectionType=${affectionType}`)
+        .then(response => response.json())
+        .then(users => {
+            const userList = document.getElementById('affection-users-list');
+            const title = document.getElementById('affection-type-title');
+            title.textContent = `${affectionType.charAt(0) + affectionType.slice(1).toLowerCase()}s for ${contextType.charAt(0) + contextType.slice(1).toLowerCase()}`;
+            userList.innerHTML = users.map(user => `<li>${user.name}</li>`).join('');
+            showPopup();
+        })
+        .catch(error => console.error('Error fetching affection users:', error));
+}
+function showAffectionUsers(contextId, contextType, affectionType) {
+    fetch(`http://localhost:8080/affections?contextId=${contextId}&contextType=${contextType}&affectionType=${affectionType}`)
+        .then(response => response.json())
+        .then(users => {
+            const userList = users.map(user => `<li>${user.name}</li>`).join('');
+            const popupHtml = `
+                <div id="popup-${contextId}-${contextType}-${affectionType}" class="popup">
+                    <h3>${affectionType}d by:</h3>
+                    <ul>${userList}</ul>
+                    <button onclick="closePopup('${contextId}-${contextType}-${affectionType}')">Close</button>
+                </div>`;
+            document.body.insertAdjacentHTML('beforeend', popupHtml);
+        })
+        .catch(error => console.error('Error fetching affection users:', error));
+}
+
+function closePopup(popupId) {
+    const popup = document.getElementById('popup-' + popupId);
+    if (popup) {
+        popup.remove();
+    }
+}
+
+function showPopup() {
+    document.getElementById('affection-popup').style.display = 'block';
 }
 
 
@@ -190,29 +349,57 @@ window.onload = fetchUsers;
     </script>
 </head>
 <body>
-    <h1>Posts</h1>
-    <% if (error) { %>
-        <p><%= error %></p>
-    <% } %>
-    <% if (posts.length > 0) { %>
-        <% posts.forEach(post => { %>
-            <div class="post-container">
-                <div class="post-header">
-                    <div class="user-avatar"></div>
-                    <div class="user-name"><%= post.user.name %></div>
+    <!-- Form to Submit a New Post -->
+    <a href="/new-post" class="create-post-button">Create New Post</a>
+
+   <h1>Posts</h1>
+   <% if (error) { %>
+       <p><%= error %></p>
+   <% } %>
+   <% if (posts.length > 0) { %>
+       <% posts.forEach(post => { %>
+           <div class="post-container">
+               <div class="post-header">
+                   <div class="user-avatar"></div>
+                   <div class="user-name"><%= post.user.name %></div>
+               </div>
+               <div class="post-content"><%= post.statement %></div>
+               <div class="post-affection">
+                <!-- Likes and Dislikes Counts with Click Handlers -->
+                <div class="likes" onclick="showAffectionUsers('<%= post.id %>', 'POST', 'LIKE')">
+                    Likes: <%= post.affectionCount.likes %>
                 </div>
-                <div class="post-content"><%= post.statement %></div>
-                <div class="post-affection">
-                    <div class="likes">Likes: <%= post.affection.likes %></div>
-                    <div class="dislikes">Dislikes: <%= post.affection.dislikes %></div>
+                <div class="dislikes" onclick="showAffectionUsers('<%= post.id %>', 'POST', 'DISLIKE')">
+                    Dislikes: <%= post.affectionCount.dislikes %>
                 </div>
-                <button onclick="showComments(<%= post.id %>)">Show Comments</button>
-                <div id="comments-<%= post.id %>" class="comments-section"></div>
-                <a id="load-more-<%= post.id %>" class="load-more" style="display: none;" onclick="loadMoreComments(<%= post.id %>)">View More Comments</a>
+            
+                <!-- Updated User Dropdown for Post -->
+                <select id="user-id-<%= post.id %>" data-context-id="<%= post.id %>" data-context-type="POST">
+                    <!-- User options will be populated here -->
+                </select>
+            
+                <!-- Like/Dislike Buttons for Post -->
+                <button onclick="likeAffection('<%= post.id %>', 'POST')">Like</button>
+                <button onclick="dislikeAffection('<%= post.id %>', 'POST')">Dislike</button>
             </div>
-        <% }) %>
-    <% } else { %>
-        <p>No posts available.</p>
-    <% } %>
+            
+               <button onclick="showComments(<%= post.id %>)">Show Comments</button>
+               <div id="comments-<%= post.id %>" class="comments-section"></div>
+               <a id="load-more-<%= post.id %>" class="load-more" style="display: none;" onclick="loadMoreComments(<%= post.id %>)">View More Comments</a>
+           </div>
+       <% }) %>
+   <% } else { %>
+       <p>No posts available.</p>
+   <% } %>
+
+
+
+   <div id="affection-popup" class="popup" style="display: none;">
+    <div class="popup-content">
+        <span class="close-button" onclick="closePopup()">×</span>
+        <h3 id="affection-type-title"></h3>
+        <ul id="affection-users-list"></ul>
+    </div>
+</div>
 </body>
 </html>
